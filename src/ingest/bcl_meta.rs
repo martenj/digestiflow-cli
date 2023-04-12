@@ -1,7 +1,7 @@
 //! Code for accessing data in the raw output directories.
 
 use chrono::{NaiveDate, NaiveDateTime};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use sxd_document::dom::Document;
 use sxd_xpath::nodeset::Node;
 use sxd_xpath::{evaluate_xpath, Value};
@@ -19,7 +19,9 @@ pub enum FolderLayout {
     /// NovaSeq
     NovaSeq,
     /// MiSeq (Windows 10)
-    MiSeq
+    MiSeq,
+    /// NextSeq 2000
+    NextSeq2000
 }
 
 pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
@@ -65,11 +67,16 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
             .join("L001_2.cbcl"),
     ];
     let novaseq_marker_all = vec![path.join("RunParameters.xml")];
+    let nextseq2000_marker: Vec<PathBuf> = vec![path.join("FocusModelGeneration")];
 
     if novaseq_marker_all.iter().all(|ref m| m.exists())
         && novaseq_marker_any.iter().any(|ref m| m.exists())
     {
         Ok(FolderLayout::NovaSeq)
+    } else if novaseq_marker_all.iter().all(|ref m| m.exists())
+        && nextseq2000_marker.iter().any(|ref m| m.exists())
+    {
+        Ok(FolderLayout::NextSeq2000)
     } else if miseqdep_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeqDep)
     } else if miseq_marker.iter().all(|ref m| m.exists()) {
@@ -369,7 +376,7 @@ pub fn process_xml(
 
     let run_params = match folder_layout {
         FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseq(param_doc)?,
-        FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
+        FolderLayout::MiniSeq | FolderLayout::NovaSeq | FolderLayout::NextSeq2000 => process_xml_param_doc_miniseq(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
             folder_layout

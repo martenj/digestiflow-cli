@@ -341,6 +341,7 @@ fn process_folder(
             FolderLayout::MiniSeq => "RunParameters.xml",
             FolderLayout::HiSeqX => "RunParameters.xml",
             FolderLayout::NovaSeq => "RunParameters.xml",
+            FolderLayout::NextSeq2000 => "RunParameters.xml"
         };
         let mut xmlf = File::open(path.join(filename))
             .chain_err(|| format!("Problem reading {}", &filename))?;
