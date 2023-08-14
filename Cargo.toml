@@ -1,6 +1,6 @@
 [package]
 name = "digestiflow-cli"
-version = "0.5.11"
+version = "0.5.13"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bih-charite.de>", "Marten Jäger <marten.jaeger@bih-charite.de>"]
 
 [dependencies]

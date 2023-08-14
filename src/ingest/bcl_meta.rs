@@ -19,7 +19,9 @@ pub enum FolderLayout {
     /// NovaSeq
     NovaSeq,
     /// MiSeq (Windows 10)
-    MiSeq
+    MiSeq,
+    /// NovaSeq X plus
+    NovaSeqXplus,
 }
 
 pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
@@ -65,12 +67,18 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
             .join("L001_2.cbcl"),
     ];
     let novaseq_marker_all = vec![path.join("RunParameters.xml")];
+//    let novaseqxplus_marker = vec![path.join("Manifest.tsv")];
+    let novaseqxplus_marker = vec![path.join("InstrumentAnalyticsLogs")];
 
     if novaseq_marker_all.iter().all(|ref m| m.exists())
         && novaseq_marker_any.iter().any(|ref m| m.exists())
     {
-        Ok(FolderLayout::NovaSeq)
-    } else if miseqdep_marker.iter().all(|ref m| m.exists()) {
+       if novaseqxplus_marker.iter().any(|ref m| m.exists()) {
+            Ok(FolderLayout::NovaSeqXplus)
+        } else {
+            Ok(FolderLayout::NovaSeq)
+        }
+     } else if miseqdep_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeqDep)
     } else if miseq_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeq)
@@ -158,6 +166,8 @@ pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
         good.format("%F").to_string()
     } else {
         if let Ok(good) = NaiveDateTime::parse_from_str(&xml_date, "%-m/%-d/%Y %-I:%M:%S %p") {
+            good.format("%F").to_string()
+        } else if let Ok(good) = NaiveDateTime::parse_from_str(&xml_date, "%Y-%m-%dT%H:%M:%SZ") {
             good.format("%F").to_string()
         } else {
             bail!("Could not parse date from string {}", &xml_date);
@@ -358,6 +368,82 @@ pub fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameter
     })
 }
 
+
+pub fn process_xml_param_doc_novaseqxplus(info_doc: &Document) -> Result<RunParameters> {
+    let mut number = 1;
+
+    let reads = if let Value::Nodeset(nodeset) =
+        evaluate_xpath(&info_doc, "//Read")
+            .chain_err(|| "Problem finding PlannedReads or Read tags")?
+    {
+        let mut reads = Vec::new();
+        for node in nodeset.document_order() {
+            if let Node::Element(elem) = node {
+                let num_cycles = elem
+                    .attribute("Cycles")
+                    .expect("Problem accessing Cycles attribute")
+                    .value()
+                    .to_string()
+                    .parse::<i32>()
+                    .unwrap();
+                if num_cycles > 0 {
+                    reads.push(ReadDescription {
+                        number: number,
+                        num_cycles: num_cycles,
+                        is_index: elem
+                            .attribute("ReadName")
+                            .expect("Problem accessing ReadName attribute")
+                            .value()
+                            .to_string()
+                            .starts_with("Index")
+                    });
+                    number += 1;
+                }
+            } else {
+                bail!("PlannedRead or Read was not a tag!")
+            }
+        }
+        reads
+    } else {
+        bail!("Problem getting Read or RunInfoRead elements")
+    };
+
+    let rta_version3 = evaluate_xpath(&info_doc, "//RtaVersion/text()")
+        .chain_err(|| "Problem getting RTAVersion element")?
+        .into_string();
+    let systemsuite_version = evaluate_xpath(&info_doc, "//SystemSuiteVersion/text()")
+        .chain_err(|| "Problem getting SystemSuiteVersion element")?
+        .into_string();
+
+    Ok(RunParameters {
+        planned_reads: reads,
+        rta_version: if !rta_version3.is_empty() {
+            rta_version3[1..].to_string()
+        } else {
+            systemsuite_version
+        },
+        run_number: evaluate_xpath(&info_doc, "//RunNumber/text()")
+            .chain_err(|| "Problem getting RunNumber element")?
+            .into_number() as i32,
+        flowcell_slot: if let Ok(elem) = evaluate_xpath(&info_doc, "//Side/text()") {
+            let elem = elem.into_string();
+            if elem.is_empty() {
+                "A".to_string()
+            } else {
+                elem
+            }
+        } else {
+            "A".to_string()
+        },
+
+        experiment_name: if let Ok(elem) = evaluate_xpath(&info_doc, "//ExperimentName/text()") {
+            elem.into_string()
+        } else {
+            "".to_string()
+        },
+    })
+}
+
 pub fn process_xml(
     logger: &slog::Logger,
     folder_layout: FolderLayout,
@@ -370,6 +456,7 @@ pub fn process_xml(
     let run_params = match folder_layout {
         FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseq(param_doc)?,
         FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
+        FolderLayout::NovaSeqXplus => process_xml_param_doc_novaseqxplus(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
             folder_layout
