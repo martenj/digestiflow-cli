@@ -408,20 +408,21 @@ pub fn process_xml_param_doc_novaseqxplus(info_doc: &Document) -> Result<RunPara
         bail!("Problem getting Read or RunInfoRead elements")
     };
 
-    let rta_version3 = evaluate_xpath(&info_doc, "//RtaVersion/text()")
-        .chain_err(|| "Problem getting RTAVersion element")?
-        .into_string();
+//    let rta_version3 = evaluate_xpath(&info_doc, "//RtaVersion/text()")
+//        .chain_err(|| "Problem getting RTAVersion element")?
+//        .into_string();
     let systemsuite_version = evaluate_xpath(&info_doc, "//SystemSuiteVersion/text()")
         .chain_err(|| "Problem getting SystemSuiteVersion element")?
         .into_string();
 
     Ok(RunParameters {
         planned_reads: reads,
-        rta_version: if !rta_version3.is_empty() {
-            rta_version3[1..].to_string()
-        } else {
-            systemsuite_version
-        },
+//        rta_version: if !rta_version3.is_empty() {
+//            rta_version3[1..].to_string()
+//       } else {
+//           systemsuite_version
+//        },
+        rta_version: ["3",&systemsuite_version].join("."),
         run_number: evaluate_xpath(&info_doc, "//RunNumber/text()")
             .chain_err(|| "Problem getting RunNumber element")?
             .into_number() as i32,
