@@ -436,7 +436,7 @@ pub fn find_file_stacks(
 
             Ok(tile_stacks)
         }
-        FolderLayout::NovaSeq | FolderLayout::NovaSeqXplus => {
+        FolderLayout::NovaSeq | FolderLayout::NovaSeqXplus | FolderLayout::NextSeq2000 => {
             let path = path
                 .join("Data")
                 .join("Intensities")
