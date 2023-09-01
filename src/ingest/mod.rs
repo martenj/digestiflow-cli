@@ -342,12 +342,14 @@ fn process_folder(
             FolderLayout::HiSeqX => "RunParameters.xml",
             FolderLayout::NovaSeq => "RunParameters.xml",
             FolderLayout::NovaSeqXplus => "RunParameters.xml",
+            FolderLayout::NextSeq2000 => "RunParameters.xml",
         };
         let mut xmlf = File::open(path.join(filename))
             .chain_err(|| format!("Problem reading {}", &filename))?;
         let mut contents = String::new();
         xmlf.read_to_string(&mut contents)
             .chain_err(|| format!("Problem reading XML from {}", &filename))?;
+        contents = contents.to_string().trim_start_matches("\u{feff}").to_owned();
         parser::parse(&contents).chain_err(|| format!("Problem parsing XML from {}", &filename))?
     };
     let param_doc = param_pkg.as_document();
