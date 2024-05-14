@@ -527,7 +527,12 @@ pub fn process_xml_param_doc_nextseq2000(info_doc: &Document) -> Result<RunParam
     Ok(RunParameters {
         planned_reads: reads,
         rta_version: if !rta_version3.is_empty() {
-            rta_version3.to_string()
+//      fix for new NextSeq2000 running RTA version 4.xxx
+            if rta_version3.starts_with("4") {
+                "3".to_string()
+            } else {
+                rta_version3.to_string()
+            }
         } else {
             rta_version
         },
